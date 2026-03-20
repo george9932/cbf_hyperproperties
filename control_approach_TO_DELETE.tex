@@ -1,0 +1,76 @@
+\subsection{Control approach} 
+
+For each $\boldsymbol{\eta}_j \in P$, consider an alternative trajectory $\hat{\mathbf{x}}_{\boldsymbol{\eta}_j, \hat{\boldsymbol{\nu}_j}}(t)$ with initial condition $\hat{\mathbf{x}}_{\boldsymbol{\eta}_j, \hat{\boldsymbol{\nu}_j}}(0) = \boldsymbol{\eta}_j$ and input $\hat{\boldsymbol{\nu}}_j(t)$. The nominal trajectory is $\mathbf{x}_{\boldsymbol{\xi}, \boldsymbol{\nu}}(t)$ with $\mathbf{x}_{\boldsymbol{\xi}, \boldsymbol{\nu}}(0) = \boldsymbol{\xi}$ and input $\boldsymbol{\nu}(t)$. To enforce contraction (cf. Def.~\ref{def:contraction}) we must find a nominal controller $\boldsymbol{\nu}$ and alternative controllers $\hat{\boldsymbol{\nu}}_j$, $j = 1, \dots, N$, such that \eqref{eq:contraction} holds for the trajectory pairs $\mathbf{x}_{\boldsymbol{\xi}, \boldsymbol{\nu}}$ and $\hat{\mathbf{x}}_{\boldsymbol{\eta}_j, \hat{\boldsymbol{\nu}_j}}$, $j = 1, \dots, N$. If such controllers do not exist for any pair, contraction is violated. It is noted that, while each alternative trajectory may use its own
+controller $\hat{\boldsymbol{\nu}}_j$, the nominal controller $\boldsymbol{\nu}$ must satisfy the contraction condition for all $N$ pairs simultaneously, reflecting the $\exists \, \forall$ structure of the contraction hyperproperty.
+
+We define the state errors $\mathbf{e}_j = \mathbf{x} - \hat{\mathbf{x}}_j$, with $\mathbf{e}_j(0) = \boldsymbol{\xi} - \boldsymbol{\eta}_j$, $j = 1, \dots, N$.
+\begin{lemma}\label{lemma:khalil}
+\cite{khalil2002} Let $V:\mathbb{R}^n \to \mathbb{R}_{\ge 0}$ be a positive definite function of the error. Suppose there exist controllers $\boldsymbol{\nu}$ and $\hat{\boldsymbol{\nu}}_j$, $j=1, \dots, N$, such that along the error dynamics, it holds that $\dot V(\mathbf{e}_j) \le -\alpha(V(\mathbf{e}_j))$, for all $j = 1, \dots, N$ and $t \in \mathbb{R}_{\ge 0}$, where $\alpha$ is a locally Lipschitz class-$\mathcal{K}$ function. Then, there exists a class-$\mathcal{KL}$ function $\zeta$ such that $\|\mathbf{e}_j(t)\| \le \zeta(\|\mathbf{e}_j(0)\|,t)$ for all $j = 1, \dots, N$ and $t \in \mathbb{R}_{\ge 0}$.
+\end{lemma}
+
+Namely, if controllers $\boldsymbol{\nu}$ and $\hat{\boldsymbol{\nu}}_j$, $j = 1, \dots, N$, satisfy the Lyapunov inequality $\dot V(\mathbf{e}_j) \le -\alpha(V(\mathbf{e}_j))$, for all $j = 1, \dots, N$, then \eqref{eq:contraction} holds for all trajectory pairs $(\mathbf{x}_{\boldsymbol{\xi},\boldsymbol{\nu}}, \hat{\mathbf{x}}_{\boldsymbol{\eta}_j,\hat{\boldsymbol{\nu}}_j})$. Let the augmented state and control input be $\bar{\mathbf{x}} = (\mathbf{x}, \hat{\mathbf{x}}_1, \dots, \hat{\mathbf{x}}_N)$, and $\bar{\mathbf{u}} =
+(\mathbf{u},\hat{\mathbf{u}}_1,\dots,\hat{\mathbf{u}}_N)$, respectively.
+Using the system dynamics in \eqref{eq:system}, the derivative of $V(\mathbf{e}_j)$ can be written as an affine function of $\bar{\mathbf{u}}$. Hence, the $N$ Lyapunov inequalities can be expressed in matrix form as
+\[
+    \mathbf{q}_1(\bar{\mathbf{x}}) + \mathbf{Q}_2(\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \le \mathbf{0},
+\]
+where $\bar{\mathbf{x}} \in \mathbb{R}^{(N+1) n}$, $\bar{\mathbf{u}} \in \mathbb{R}^{(N+1) m}$, $\mathbf{q}_1:\mathbb{R}^{(N+1)n} \to \mathbb{R}^N$, and $\mathbf{Q}_2: \mathbb{R}^{(N+1) n} \to \mathbb{R}^{N \times (N+1) m}$. Equivalently, the satisfaction of these inequalities can be checked by solving
+\begin{equation} \label{eq:qp2}
+    \begin{aligned}
+        c(\bar{\mathbf{x}}) = \max_{t, \bar{\mathbf{u}}} \quad & t \\
+        \text{s.t.} \quad & \mathbf{q}_1(\bar{\mathbf{x}}) + \mathbf{Q}_2(\bar{\mathbf{x}}) \, \bar{\mathbf{u}}
+        \ge t\mathbf{1}, \\
+        & \bar{\mathbf{u}} \in \mathbb{U}^{N+1}.
+    \end{aligned}
+\end{equation}
+If $\mathbb{U}$ is polytopic, the above program is a linear optimization problem. The optimal value $c(\bar{\mathbf{x}})$ represents the largest robustness margin with respect to violation of the $N$ Lyapunov inequalities at the augmented state $\bar{\mathbf{x}}$.
+
+To express these inequalities compactly, we introduce the augmented dynamics of the $(N+1)$ copies of the system. Define $\bar{\mathbf{f}}(\bar{\mathbf{x}}) = \begin{bmatrix} \mathbf{f}(\mathbf{x}) & \mathbf{f}(\hat{\mathbf{x}}_1) & \dots & \mathbf{f}(\hat{\mathbf{x}}_N) \end{bmatrix}^\top$ and $\bar{\mathbf{g}}(\mathbf{z}) = \operatorname{blkdiag} \left( \mathbf{g}(\mathbf{x}), \mathbf{g}(\hat{\mathbf{x}}_1), \dots, \mathbf{g}(\hat{\mathbf{x}}_N) \right)$.
+The augmented dynamics can then be written as $\dot{\bar{\mathbf{x}}} = \bar{\mathbf{f}}(\bar{\mathbf{x}}) + \bar{\mathbf{g}}(\bar{\mathbf{x}}) \, \bar{\mathbf{u}}$, where $\bar{\mathbf{f}}$ and $\bar{\mathbf{g}}$ are locally Lipschitz, as $\mathbf{f}$ and $\mathbf{g}$ are locally Lipschitz. Since $V$ is continuously differentiable and $\alpha$ is locally Lipschitz, $\mathbf{q}_1$ and $\mathbf{Q}_2$ are locally Lipschitz in $\bar{\mathbf{x}}$. In particular, for $j \in \{1, \dots, N\}$ and fixed $\mathbf{x}$, $\hat{\mathbf{x}}_i$, for all $i \neq j$, suppose $\mathbf{q}_1(\bar{\mathbf{x}})$ and $\mathbf{Q}_2(\bar{\mathbf{x}})$ are Lipschitz in $\hat{\mathbf{x}}_j$ on a compact set containing the $n$-cube $B(\hat{\mathbf{x}}_j, r)$. Then there exist constants $L_{j, 1}$, $L_{j, 2} \ge 0$ such that for all $\hat{\mathbf{x}}_j,\hat{\mathbf{x}}_j' \in B(\hat{\mathbf{x}}_j, r)$
+\[
+    ||\mathbf{q}_1(\bar{\mathbf{x}}) - \mathbf{q}_1(\bar{\mathbf{x}}')||_\infty \le L_{j,1} \|\hat{\mathbf{x}}_j - \hat{\mathbf{x}}_j'\|_\infty,
+\]
+\[
+    ||\mathbf{Q}_2(\bar{\mathbf{x}}) - \mathbf{Q}_2(\bar{\mathbf{x}}')||_\infty \le L_{j,2} \|\hat{\mathbf{x}}_j - \hat{\mathbf{x}}_j'\|_\infty,
+\]
+Therefore, if $c(\bar{\mathbf{x}}) > 0$, Lipschitz continuity implies the existence of a neighborhood of $\bar{\mathbf{x}}$ where only $\hat{\mathbf{x}}_j$ varies in which the inequalities $\mathbf{q}_1(\bar{\mathbf{x}}) + \mathbf{Q}_2(\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \le 0$ remain satisfied. 
+
+\begin{proposition}
+    Let $(c(\bar{\mathbf{x}}), \bar{\mathbf{u}}^\star(\bar{\mathbf{x}}))$ be the optimal solution of \eqref{eq:qp2} at $\bar{\mathbf{x}}$. For $j \in \{1,\dots,N\}$ and fixed $\mathbf{x}$, $\hat{\mathbf{x}}_i$, for all $i \neq j$,  define $\bar{\mathbf{u}}_j^\star = (\mathbf{u}^\star, \hat{\mathbf{u}}_j^\star)$ and
+    \[
+        \rho_j := \frac{2 \, c(\bar{\mathbf{x}})} {L_{j,1}+L_{j,2}\|\bar{\mathbf{u}}_j^\star\|_\infty}.
+    \]
+    If $\rho_j \ge r$, then for every $\bar{\mathbf{x}}' = (\mathbf{x}, \hat{\mathbf{x}}_1, \dots, \hat{\mathbf{x}}_j', \dots, \hat{\mathbf{x}}_N)$ with $\hat{\mathbf{x}}_j' \in B(\hat{\mathbf{x}}_j,r)$ it holds that
+    \[
+        \mathbf{q}_1(\bar{\mathbf{x}}') + \mathbf{Q}_2(\bar{\mathbf{x}}') \, \bar{\mathbf{u}}_j^\star \ge 0.
+    \]
+\end{proposition}
+\begin{proof}
+By optimality of \eqref{eq:qp2}, we have
+\[
+    \mathbf{q}_1(\bar{\mathbf{x}}) + \mathbf{Q}_2(\bar{\mathbf{x}}) \, \bar{\mathbf{u}}^\star \geq c(\bar{\mathbf{x}}) \mathbf{1}.
+\]
+For any $\bar{\mathbf{x}}' = (\mathbf{x}, \hat{\mathbf{x}}_1, \dots, \hat{\mathbf{x}}_j', \dots, \hat{\mathbf{x}}_N)$ with $\hat{\mathbf{x}}_j \in B(\hat{\mathbf{x}}_j,r)$,
+\[
+    \mathbf{q}_1(\bar{\mathbf{x}}') + \mathbf{Q}_2(\bar{\mathbf{x}}') \, \bar{\mathbf{u}}^\star
+\] \[    
+    = \!\! \big( \mathbf{q}_1(\bar{\mathbf{x}}') - \mathbf{q}_1(\bar{\mathbf{x}}) \big) + \big( \mathbf{Q}_2(\bar{\mathbf{x}}') - \mathbf{Q}_2(\bar{\mathbf{x}}) \big) \, \bar{\mathbf{u}}^\star + \mathbf{q}_1(\bar{\mathbf{x}}) + \mathbf{Q}_2(\bar{\mathbf{x}}) \, \bar{\mathbf{u}}^\star 
+\] \[
+    \geq \big( \mathbf{q}_1(\bar{\mathbf{x}}') - \mathbf{q}_1(\bar{\mathbf{x}}) \big) + \big( \mathbf{Q}_2(\bar{\mathbf{x}}') - \mathbf{Q}_2(\bar{\mathbf{x}}) \big) \, \bar{\mathbf{u}}^\star +  c(\bar{\mathbf{x}}) \mathbf{1}.
+\]
+Moreover, it holds that
+\[
+    || \big( \mathbf{q}_1(\bar{\mathbf{x}}') - \mathbf{q}_1(\bar{\mathbf{x}}) \big) + \big( \mathbf{Q}_2(\bar{\mathbf{x}}') - \mathbf{Q}_2(\bar{\mathbf{x}}) \big) \, \bar{\mathbf{u}}^\star ||_\infty
+\] \[
+    \leq || \mathbf{q}_1(\bar{\mathbf{x}}') - \mathbf{q}_1(\bar{\mathbf{x}}) ||_\infty + || \mathbf{Q}_2(\bar{\mathbf{x}}') - \mathbf{Q}_2(\bar{\mathbf{x}}) ||_\infty \,||\bar{\mathbf{u}}^\star ||_\infty
+\] \[
+    \leq L_{j, 1} \|\hat{\mathbf{x}}_j - \hat{\mathbf{x}}_j'\|_\infty + L_{j, 2} \|\hat{\mathbf{x}}_j - \hat{\mathbf{x}}_j'\|_\infty  \,||\bar{\mathbf{u}}^\star ||_\infty
+\] \[
+    \leq (L_{j, 1} + L_{j, 2} \,||\bar{\mathbf{u}}^\star ||_\infty) \, \frac{r}{2} \leq (L_{j, 1} + L_{j, 2} \,||\bar{\mathbf{u}}^\star ||_\infty) \, \frac{\rho_j}{2} \leq c(\bar{\mathbf{x}}).
+\]
+Combining the inequalities above, if $\rho_j \geq r$, then, for any $\bar{\mathbf{x}}' = (\mathbf{x}, \hat{\mathbf{x}}_1, \dots, \hat{\mathbf{x}}_j', \dots, \hat{\mathbf{x}}_N)$ with $\hat{\mathbf{x}}_j \in B(\hat{\mathbf{x}}_j,r)$,
+\[
+    \mathbf{q}_1(\bar{\mathbf{x}}') + \mathbf{Q}_2(\bar{\mathbf{x}}') \, \bar{\mathbf{u}}^\star \geq \mathbf{0},
+\]
+which completes the proof.
+\end{proof}

@@ -1,0 +1,556 @@
+\documentclass[journal,twoside,web]{ieeecolor}
+
+\usepackage{generic}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{mathtools}
+\usepackage{graphicx}
+% \usepackage{subfigure}
+\usepackage{epsfig} % for postscript graphics files
+\usepackage{cite}
+%\usepackage{amsthm}  % assumes amsmath package installed
+%\usepackage{widetext}
+\usepackage{lcsys}
+
+\newcommand{\sy}[1]{\textcolor{red}{SY: #1}}
+\newcommand{\bl}[1]{\textcolor{blue}{#1}}
+
+%---------
+
+%\documentclass[letterpaper, 10pt, conference]{ieeeconf}  % Comment this line out if you need a4paper
+
+%\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
+
+%\IEEEoverridecommandlockouts                              % This command is only needed if
+                                                          % you want to use the \thanks command
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{problem}[theorem]{Problem}
+
+\pagestyle{empty} % Removes all the page numbers (except for the title page)
+
+% Algorithms 
+% \usepackage{algorithm}
+% \usepackage[noend]{algpseudocode}
+% \newcommand{\algorithmautorefname}{Algorithm}
+% \algrenewcommand{\Require}{\Statex \textbf{Input:}}  
+% \algrenewcommand{\Ensure}{\Statex \textbf{Output:}} 
+
+\begin{document}
+
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\markboth{\journalname, VOL. XX, NO. XX, XXXX 2017}
+{Author \MakeLowercase{\textit{et al.}}: Preparation of Papers for IEEE Control Systems Letters (August 2022)}
+
+
+\title{Control Synthesis for Security Hyperproperties Using Control Barrier Functions}
+
+
+\author{
+Georgios Mitsos$^{a}$,
+Siyuan Liu$^{a}$
+\thanks{$^{a}$ Department of Electrical Engineering, Eindhoven University of Technology, Eindhoven, the Netherlands; \{\texttt{g.mitsos, s.liu5}\}\texttt{@tue.nl}
+}  
+}
+
+\maketitle
+\thispagestyle{empty}
+ 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{abstract}
+    Many security and privacy requirements in cyber-physical systems are inherently relational, involving comparisons across multiple system executions rather than properties of single executions. Such requirements, known as hyperproperties, naturally arise in information-flow security and include notions such as opacity, noninterference, and $K$-anonymity. Since such properties cannot, in general, be expressed using standard temporal logics, HyperLTL has emerged as a powerful tool for specifying a broad class of security requirements.
+    This paper presents an online control synthesis framework for enforcing hyperproperties in continuous-time control-affine systems using control barrier functions (CBFs). Hyperproperties are encoded in HyperLTL and enforced by constructing CBFs over an augmented state space that captures multiple system executions. The resulting barrier conditions are incorporated as constraints in a quadratic program, enabling real-time controller synthesis with formal guarantees of hyperproperty satisfaction. 
+    The proposed framework provides a unified approach for integrating formal information-flow security requirements into continuous-time controller synthesis. We show how representative security notions can be formulated within the proposed framework and synthesize controllers that enforce them online. Finally, case studies demonstrate the effectiveness of the proposed approach.
+\end{abstract}
+
+\begin{IEEEkeywords}
+    Cyber-physical systems, Hyperproperties, Security, Controller synthesis, Control barrier functions
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:introduction}
+
+\IEEEPARstart{A}{utonomous} cyber-physical systems (CPS) increasingly operate in uncertain, dynamic, and potentially adversarial environments where correct behavior must be ensured not only along a single trajectory, but across families of trajectories arising from uncertainty and/or adversarial observation. At the same time, modern robotic systems must accomplish complex tasks while providing formal correctness guarantees. Formal specification and synthesis methods based on temporal logics have therefore become central tools for motion planning and control \cite{fainekos2009, kloetzer2008}, enabling high-level task specification, and fully-automated and correct-by-design controller synthesis \cite{smith2011}.
+
+Standard linear temporal logic (LTL) specifications, however, describe properties of individual executions. Many requirements in robotics and CPS are instead relational, i.e., they compare multiple system executions of the same system \cite{wang2020}. For example, optimality compares trajectories with respect to a given cost criterion, while robustness compares nominal and perturbed executions to ensure that desired system behavior is satisfied despite uncertainty.
+Many security and privacy requirements are also inherently relational. Specifically, they ask whether two or more executions can be distinguished by an adversary, and therefore cannot, in general, be expressed as standard single-trace LTL properties.
+
+In this work, we focus on security hyperproperties for CPS. We consider a malicious intruder modeled as an external observer that has only partial access to the system executions through an output function. The intruder does not observe the full state, but attempts to infer hidden information from the observed outputs. This setting naturally captures information-flow security requirements \cite{zhao2024}. Opacity \cite{saboori2007} requires that the intruder cannot determine whether the system has executed a secret behavior, such as visiting a sensitive region.
+Noninterference \cite{xiang2021} requires that confidential high-security inputs do not influence low-security outputs observed by the intruder. 
+$K$-anonymity \cite{yin2016} requires maintaining $K$ indistinguishable copies of the system such that the intruder cannot infer the execution responsible for a sensitive event. These properties compare what the intruder observes across multiple possible executions and are therefore naturally expressed as hyperproperties \cite{clarkson2010}.
+
+Hyperlogics provide formal languages for specifying such multi-execution requirements. In particular, HyperLTL and HyperCTL extend temporal logics with explicit quantification over traces \cite{clarkson2014}, allowing formulas that relate several system executions through universal and existential quantifiers \cite{finkbeiner2015}. For continuous and real-valued signals, related formalisms such as HyperSTL have also been proposed \cite{nguyen2017}. 
+
+Verification of hyperproperties has advanced substantially via automata-based model checking \cite{clarkson2014}, dedicated tools \cite{finkbeiner2015}, and, more recently, certificate-based approaches \cite{anand2024}. In contrast, control synthesis for hyperproperties has received increasing attention only recently. In both verification and control synthesis, most existing approaches target discrete-event systems (DES) \cite{wang2020, finkbeiner2015}, while recent approaches extend to discrete-time \cite{anand2024, zhao2025} and continuous-time \cite{cui2026} dynamical systems. Similarly, opacity-preserving synthesis is primarily studied for DES \cite{yang2023, yu2022} or discrete-time systems through offline synthesis procedures \cite{zhong2025}. As a result, the online enforcement of security hyperproperties for continuous-time CPS remains largely unexplored.
+
+Continuous-time CPS require online, real-time control capable of reacting to disturbances and uncertainty during operation. Control barrier functions (CBFs) provide a suitable optimization-based framework for online synthesis of safety-critical controllers by rendering safe sets forward invariant \cite{ames2014, ames2019}. CBFs have also been combined with temporal-logic objectives to enable real-time control for complex tasks \cite{lindemann2019, srinivasan2021}.
+
+This paper develops an online CBF-based control synthesis framework for enforcing security hyperproperties (specified in HyperLTL) in continuous-time control-affine systems. We construct CBF conditions on an augmented system that captures the executions being compared. The resulting constraints are incorporated into a quadratic program (QP), yielding real-time controllers with formal guarantees of hyperproperty satisfaction. As representative security requirements, we introduce a continuous-time notion of approximate opacity, and utilize the proposed formulation to enforce security hyperproperties such as noninterference and $K$-anonymity.
+
+\sy{Need one more paragraph here stating the contribution of this paper, and comparison with the most related works.}
+
+The remainder of the paper is organized as follows.
+Section~\ref{sec:preliminaries} introduces notation and preliminaries. 
+Section~\ref{sec:security} formulates the security hyperproperties considered in this work using HyperLTL. 
+Section~\ref{sec:control} develops the CBF-based control synthesis framework that enforces the hyperproperties.
+Section~\ref{sec:case_study} illustrates the proposed framework through realistic case studies, and Section~\ref{sec:conclusion} concludes the paper.
+
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+\textbf{Notation.} Let $\mathbb{R}$ and $\mathbb{N}$ denote the sets of real numbers and positive integers, respectively. Let $\mathbb{R}_{\ge 0}$ denote the set of nonnegative real numbers. For $n, m \in \mathbb{N}$, $\mathbb{R}^n$ denotes the space of $n$-dimensional column vectors, and $\mathbb{R}^{n \times m}$ the space of $n \times m$ real matrices. Vectors are denoted by bold lowercase letters and matrices by bold uppercase letters.The zero vector in $\mathbb{R}^n$ and matrix in $\mathbb{R}^{n \times m}$ are denoted by $\mathbf{0}_n$ and $\mathbf{0}_{n \times m}$, respectively. For $\mathbf{x} = \begin{bmatrix} x_1 & \dots & x_n \end{bmatrix}^\top \in \mathbb{R}^n$, $\|\mathbf{x}\|$ denotes the Euclidean norm, i.e., $\|\mathbf{x}\| = \sqrt{\mathbf{x}^\top \mathbf{x}}$. The notation $\operatorname{diag}(\lambda_1, \lambda_2, \dots)$ denotes a diagonal matrix with entries $\lambda_1, \lambda_2, \dots$. A continuous function $\alpha: \mathbb{R}_{\ge 0} \to \mathbb{R}_{\ge 0}$ is said to be of class-$\mathcal{K}$ if it is strictly increasing and satisfies $\alpha(0) = 0$. The symbol for a continuously differentiable is $\mathbf{C}^1$. Given a $\mathbf{C}^1$ function $V : \mathbb{R}^n \to \mathbb{R}$ and a vector field $\mathbf{f} : \mathbb{R}^n \to \mathbb{R}^n$ , the Lie derivative of $V$ along $\mathbf{f}$ is defined as $L_\mathbf{f} V(\mathbf{x}) = \tfrac{\partial V}{\partial \mathbf{x}} \mathbf{f}(\mathbf{x})$. Similarly, for a matrix field $\mathbf{G} : \mathbb{R}^n \to \mathbb{R}^{n \times m}$, we define
+$L_{\mathbf{G}}V(\mathbf{x}) = \frac{\partial V}{\partial \mathbf{x}} \mathbf{G}(\mathbf{x})$.
+
+\subsection{System model}
+
+We consider a nonlinear input-affine control system
+\begin{equation} \label{eq:system}
+    S: \quad \dot{\mathbf{x}} = \mathbf{f}(\mathbf{x}) + \mathbf{G}(\mathbf{x}) \, \mathbf{u}, \quad \mathbf{x}(0) = \mathbf{x}_0.
+\end{equation}
+where $\mathbf{x} \in \mathbb{X} \subseteq \mathbb{R}^n$ is the state and $\mathbf{u} \in \mathbb{U} \subseteq \mathbb{R}^m$ is the control input. The initial state $\mathbf{x}_0$ satisfies $\mathbb{X}_0 \subseteq \mathbb{X} \subseteq \mathbb{R}^n$. The functions $\mathbf{f}: \mathbb{R}^n \rightarrow \mathbb{R}^n$ and $\mathbf{G}: \mathbb{R}^n \rightarrow \mathbb{R}^{n \times m}$ are locally Lipschitz continuous.
+\sy{why using capital G(x) not g(x)?}
+
+Given a controller $\boldsymbol{\nu}: \mathbb{R}_{\ge 0} \to \mathbb{U}$ and an initial state $\mathbf{x}_0 \in \mathbb{X}_0$, we denote by
+$\mathbf{x}_{\mathbf{x}_0,\boldsymbol{\nu}}: \mathbb{R}_{\ge 0} \to \mathbb{X}$
+the corresponding closed-loop trajectory of \eqref{eq:system} under $\boldsymbol{\nu}$, with $\mathbf{x}_{\mathbf{x}_0,\boldsymbol{\nu}}(0)=\mathbf{x}_0$.
+
+\subsection{Intruder model} \label{subsec:intruder}
+
+\sy{no need for a separate subsection}
+
+
+We consider a passive malicious intruder that externally observes the system through an output map
+$\mathbf{y} = \mathbf{h}(\mathbf{x})$,
+where $\mathbf{y} \in \mathbb{Y} \subseteq \mathbb{R}^q$ is the observed output and $\mathbf{h}: \mathbb{X} \to \mathbb{Y}$ is $\mathbf{C}^1$. For a trajectory $\mathbf{x}_{\mathbf{x}_0,\boldsymbol{\nu}}(t)$, the corresponding output trajectory is 
+\begin{equation} \label{eq:output}
+    \mathbf{y}_{\mathbf{x}_0, \boldsymbol{\nu}} (t) = \mathbf{h} \big( \mathbf{x}_{\mathbf{x}_0, \boldsymbol{\nu}} (t) \big), \quad \forall t \in \mathbb{R}_{\ge 0}.
+\end{equation}
+
+The intruder has knowledge of the system model in \eqref{eq:system} and of the output trajectory, but does not observe the full state trajectory, or the applied control inputs. Based on this, the intruder attempts to infer secret information about the system, e.g., whether a secret region has been visited, whether confidential actions influence observed outputs, or which execution is responsible for a sensitive event. These requirements compare the observed behavior of multiple possible executions and will be formalized later as security hyperproperties. 
+
+\subsection{Control barrier functions}
+
+Consider a system as in \eqref{eq:system} and a set $\mathcal{C} \subseteq \mathbb{X}$ defined as the superlevel set of a $\mathbf{C}^1$ function $b: \mathbb{R}^n \to \mathbb{R}$, i.e., 
+\begin{equation} \label{eq:safe_set}
+    \mathcal{C} := \{\mathbf{x} \in \mathbb{X} \mid b(\mathbf{x}) \ge 0 \}.
+\end{equation}  
+\begin{definition}\label{def:cbf}
+    Let $\mathcal{C}$ be defined as in \eqref{eq:safe_set}. The function $b$ is a CBF if there exists a locally Lipschitz class-$\mathcal{K}$ function $\alpha$ such that 
+    \begin{equation} \label{eq:cbf}
+       \sup_{\mathbf{u} \in \mathbb{U}} \Big[ L_\mathbf{f} b ( \mathbf{x}) + L_\mathbf{G} b ( \mathbf{x}) \, \mathbf{u} \Big] \ge -\alpha(b(\mathbf{x})), \ \forall \mathbf{x} \in \mathbb{X}.
+    \end{equation}
+\end{definition}
+
+\begin{theorem} \label{thm:forward_invariance}
+    \cite{ames2019} Let $\mathcal{C} \subseteq \mathbb{X}$ be defined as the superlevel set of a $\mathbf{C}^1$ function $b: \mathbb{R}^n \rightarrow \mathbb{R}$. If $b$ is a CBF, then any Lipschitz continuous controller $\mathbf{u}(\mathbf{x})$ satisfying $L_\mathbf{f} b ( \mathbf{x}) + L_\mathbf{G} b ( \mathbf{x}) \, \mathbf{u} \!\ge\! -\alpha(b(\mathbf{x}))$ renders $\mathcal{C}$ forward invariant for \eqref{eq:system}, i.e., $\mathbf{x}(0) \in \mathcal{C}$ implies $\mathbf{x}(t) \in \mathcal{C} $ for all $t \in \mathbb{R}_{\ge 0}$.
+\end{theorem}
+
+\subsection{Linear temporal logic}
+
+\sy{Try to merge this subsection with the next one on HyperLTL}
+
+Let $\mathcal{AP}$ be a finite set of atomic propositions. The syntax of LTL is defined recursively as follows \cite{baier2008}:
+\begin{equation*} \label{eq:ltl}
+    \varphi \Coloneqq \pi \mid \lnot \, \varphi \mid \varphi_1 \land \varphi_2 \mid \varphi_1 \, \mathcal{U} \, \varphi_2,
+\end{equation*}
+where $\pi \in \mathcal{AP}$, and $\varphi$, $\varphi_1$, $\varphi_2$ are LTL formulas, and $\mathcal{U}$ denotes the \emph{until} operator. The disjunction operator is defined as $\varphi_1 \lor \varphi_2 := \lnot (\lnot \varphi_1 \land \lnot \varphi_2)$ and the Boolean $true$ as $\pi \lor \lnot \pi$. The temporal operators \emph{eventually} and \emph{always} are defined by $\lozenge \varphi  := true \ \mathcal{U} \, \varphi$, and $\square \, \varphi {:=} \lnot  \lozenge \, \lnot \varphi$, respectively. The $\emph{next}$ operator $\mathcal{X}$ is omitted since it is not meaningful for continuous-time systems.
+
+A trace is an infinite word $\sigma = \sigma[1] \sigma[2] \dots$, where $\sigma[i] \in 2^\mathcal{AP}$ for all $i \in \mathbb{N}$. The set of all traces is denoted by $\Sigma^\omega = (2^\mathcal{AP})^\omega$. LTL formulas are interpreted over infinite traces. Satisfaction of an LTL formula $\varphi$ by a trace $\sigma$ is denoted by $\sigma \models \varphi$ and is defined according to the standard LTL semantics \cite{baier2008}.
+
+\subsection{HyperLTL}
+
+\sy{also, please double check if all the preliminaries about LTL, and hyperLTL are necessary. It's a bit too lengthy now.}
+
+HyperLTL extends LTL by allowing explicit quantification over multiple traces. Its syntax is given by \cite{clarkson2014}:
+\begin{equation*} \label{eq:hyperltl}
+    \begin{aligned}
+        \psi &\Coloneqq \exists \tau. \psi \mid \forall \tau .  \psi \mid \varphi \\
+        \varphi &\Coloneqq \pi_\tau \mid \lnot \, \varphi \mid \varphi_1 \land \varphi_2 \mid \varphi_1 \, \mathcal{U} \, \varphi_2,
+    \end{aligned}
+\end{equation*}
+where $\tau$ is a trace variable and $\pi_\tau$ denotes that the atomic proposition $\pi \in \mathcal{AP}$ holds on the trace assigned to $\tau$. The formula $\psi$ denotes a HyperLTL formula, while $\varphi$ denotes its quantifier-free temporal part. 
+
+Let $T$ be an infinite set of trace variables, and $\mathbb{S} \subseteq \Sigma^\omega$ a set of traces. A trace assignment is a function $V: T \to \mathbb{S}$ that maps trace variables to traces in $\mathbb{S}$. For $\sigma \in \mathbb{S}$, we denote by $V[\tau \mapsto \sigma]$ the trace assignment that maps $\tau \in T$ to $\sigma$ and agrees with $V$ on all other trace variables. For $j \in \mathbb{N}$, the assignment $V[j, \infty]$ is the suffix of the trace $V(\tau)$ starting at position $j$, i.e., $V(\tau)[j, \infty]$ for all $\tau \in T$. 
+
+Given a set of traces $\mathbb{S}$ and a trace assignment $V$, satisfaction of a HyperLTL formula $\psi$ is defined as follows \cite{clarkson2014}:
+\begin{equation*}
+    \begin{aligned}
+        &V \models_\mathbb{S} \pi_\tau &\Leftrightarrow& \ \pi \in V(\tau)[0] \\
+        &V \models_\mathbb{S} \neg \varphi &\Leftrightarrow& \ V \not\models_\mathbb{S} \varphi \\
+        &V \models_\mathbb{S} \varphi_1 \land \varphi_2 &\Leftrightarrow&  \ V \models_\mathbb{S} \varphi_1 \text{ and }  V \models_\mathbb{S} \varphi_2 \\
+        &V \models_\mathbb{S} \varphi_1 \mathcal{U} \varphi_2 &\Leftrightarrow& \ \exists i \in \mathbb{N} \text{ such that } V[i, \infty] \models_\mathbb{S} \varphi_2 \\
+        & & & \text{ and } \  V[j, \infty] \models_\mathbb{S} \varphi_1, \ \forall j < i \\
+        &V \models_\mathbb{S} \exists \tau. \psi &\Leftrightarrow& \ \exists \sigma \in \mathbb{S} \text{ such that } V[\tau \mapsto \sigma] \models_\mathbb{S} \psi \\
+        &V \models_\mathbb{S} \forall \tau. \psi &\Leftrightarrow& \ V[\tau \mapsto \sigma] \models_\mathbb{S} \psi, \ \forall \sigma \in \mathbb{S}.
+    \end{aligned}
+\end{equation*}
+A set of traces $\mathbb{S}$ satisfies a HyperLTL formula $\psi$, denoted by $\mathbb{S} \models \psi$, if $V_\emptyset \models_{\mathbb{S}} \psi$, where $V_\emptyset$ is the empty trace assignment.
+
+Each atomic proposition $\pi \in \mathcal{AP}$ is associated with a $\mathbf{C}^1$ predicate function $b_\pi: \mathbb{R}^n \to \mathbb{R}$. The proposition $\pi$ is satisfied at a state $\mathbf{x}$ if and only if $b_\pi(\mathbf{x}) \ge 0$. Although LTL and HyperLTL are defined over discrete traces, the trace assignment $V$ can be extended to continuous-time trajectories (see, e.g., Def.~4 in \cite{kloetzer2008}). Given an initial condition $\mathbf{x}_0 \in \mathbb{X}_0$ and a controller $\boldsymbol{\nu}(t)$, $t \in \mathbb{R}_{\ge 0}$, the trajectory $\mathbf{x}_{\mathbf{x}_0, \boldsymbol{\nu}}(t)$ induces a trace $\sigma = \sigma[1] \sigma[2] \dots \in \Sigma^\omega$, that represents the set of propositions satisfied along the trajectory. 
+Given a collection of closed-loop trajectories of the system $S$ in \eqref{eq:system}, let $\mathbb{S}_S \subseteq \Sigma^\omega$ denote the corresponding set of induced traces. We write $S \models \psi$ if $\mathbb{S}_S \models \psi$.
+
+HyperLTL formulas are written as
+\begin{equation*} 
+    \psi = \mu_1 \tau_1 \, \mu_2 \tau_2 \dots \mu_p \tau_p. \, \varphi(\tau_1, \tau_2, \dots, \tau_p), 
+\end{equation*}
+where $\mu_i \in \{\forall, \exists\}$ for all $i \in \{1, \dots, p\}$ and $\varphi$ is a quantifier-free LTL formula. 
+
+\section{\bl{Security Properties as HyperLTL}}
+\label{sec:security}
+
+The security requirements considered in this paper are observational \cite{cui2026}. They restrict what a passive intruder can infer from the output trajectory of the system. We first introduce approximate indistinguishability, which is the basic relation used to compare executions from the viewpoint of the intruder. We then define approximate opacity, approximate noninterference, and eventual approximate $K$-anonymity, and express each property as a HyperLTL formula.
+
+A second class of properties concerned with gaining task-relevant information, such as detectability, observability, and diagnosability, are beyond the scope of this work and are left for future research.
+
+\sy{Try to make this section more compact; no need to have separate subsections for each property.}
+
+\subsection{Approximate indistinguishability}
+
+\sy{add references for each property (e.g., Def. 3.1, 3.3., and 3.4.)}
+
+For a trajectory $\mathbf{x}_{\mathbf{x}_0,\boldsymbol{\nu}}$ of \eqref{eq:system}, the corresponding output trajectory is given in \eqref{eq:output}.
+
+\begin{definition}[Approximate indistinguishability]
+\label{def:approx_indistinguishability}
+Consider two trajectories $\mathbf{x}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}$ and
+$\mathbf{x}_{\mathbf{x}_{0,2}, \boldsymbol{\nu}_2}$ of \eqref{eq:system} and their outputs given in \eqref{eq:output}. For $\delta > 0$, the two trajectories are said to be $\delta$-\emph{approximately indistinguishable} if
+    \begin{equation*}
+        \left\| \mathbf{y}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}(t) -\mathbf{y}_{\mathbf{x}_{0,2}, \boldsymbol{\nu}_2}(t) \right\|^2 \le \delta^2, \quad \forall t\in\mathbb{R}_{\ge 0}.
+    \end{equation*}
+\end{definition}
+
+The parameter $\delta$ models the measurement precision of the intruder. Using the squared norm leads to $\mathbf{C}^1$ predicate functions given that the output function $\mathbf{h}$ is $\mathbf{C}^1$. For trace variables $\tau_i$ and $\tau_j$, we use $\mathsf{Ind}_{\delta} (\tau_i, \tau_j)$ to denote the predicate induced by $\|\mathbf{h}(\tau_i)-\mathbf{h}(\tau_j)\|^2 \le \delta^2$. Here, $\mathbf{h}(\tau_i)$ is the output associated with the trajectory assigned to trace variable $\tau_i$.
+
+\sy{For each property, add some intuitive explanations of the essence of the property.}
+
+\sy{Is there a HyperLTL formulation for indistinguishability? }
+
+\subsection{Approximate opacity}
+
+Consider the system in \eqref{eq:system}. The objective is to prevent the intruder described in \ref{subsec:intruder}, to infer whether the system trajectory has visited a prescribed secret set
+\begin{equation} \label{eq:secret_set}
+    \mathbb{X}_s = \{ \mathbf{x} \in \mathbb{X} \mid b_s(\mathbf{x}) < 0 \},
+\end{equation}
+where $b_s:\mathbb{R}^n \to \mathbb{R}$ is $\mathbf{C}^1$. We denote by $s(\tau)$ the proposition that the trajectory associated with $\tau$ lies in $\mathbb{X}_s$.
+
+\begin{definition}[Approximate infinite-horizon opacity] \label{def:opacity}
+    Consider the system in \eqref{eq:system}, an initial condition $\mathbf{x}_{0,1} \in \mathbb{X}_0$, and $\delta>0$. The system is \emph{$\delta$-approximate infinite-horizon opaque} if there exist an initial condition $\mathbf{x}_{0,2} \in \mathbb{X}_0$ and controllers $\boldsymbol{\nu}_1$, $\boldsymbol{\nu}_2: \mathbb{R}_{\ge 0} \rightarrow \mathbb{U}$ such that $\mathbf{x}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}(t)$ and $\mathbf{x}_{\mathbf{x}_{0,2}, \boldsymbol{\nu}_2}(t)$ are $\delta$-approximately indistinguishable and
+    \begin{equation*}
+        \mathbf{x}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}(t) \in \mathbb{X}_s \Rightarrow \mathbf{x}_{\mathbf{x}_{0,2}, \boldsymbol{\nu}_2}(t) \notin \mathbb{X}_s, \quad \forall t \in \mathbb{R}_{\ge 0}.
+    \end{equation*}
+\end{definition}
+Thus, whenever the real trajectory $\mathbf{x}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}$ visits the secret set, there exists an alternative trajectory $\mathbf{x}_{\mathbf{x}_{0,2}, \boldsymbol{\nu}_2}$ that is indistinguishable to the intruder and non-secret at the same time. Hence, the intruder cannot infer whether the secret visit has occurred. This property is the continuous-time analogue of $\delta$-approximate infinite-step opacity \cite{yin2021}. The corresponding HyperLTL formula is
+\begin{equation}
+\label{eq:hyperltl_opacity}
+    \psi_{\mathrm{op}} = \forall \tau_1 \, \exists \tau_2 . \, \square \left( \mathsf{Ind}_{\delta}(\tau_1,\tau_2) \land \big( \neg s(\tau_1)\lor \neg s(\tau_2) \big) \right).
+\end{equation}
+
+\subsection{Approximate noninterference}
+
+For noninterference, we partition the control input as
+\begin{equation*}
+\label{eq:input_partition}
+    \mathbf{u} = (\mathbf{u}_{L}, \mathbf{u}_{H}) = \begin{bmatrix} \mathbf{u}_{L}^{\top} & \mathbf{u}_{H}^{\top} \end{bmatrix}^{\top} \in \mathbb{U},
+\end{equation*}
+where $\mathbf{u}_{L}$ is the low-level, or public, input and $\mathbf{u}_{H}$ is the high-level, or confidential, input. The purpose of noninterference is to ensure that changes in the confidential input do not induce observable differences that can be detected by the intruder.
+
+\begin{definition}[Approximate noninterference]
+\label{def:noninterference}
+    Consider the system in \eqref{eq:system} and an initial condition $\mathbf{x}_{0,1} \in \mathbb{X}_0$. The system satisfies $\delta$-\emph{approximate noninterference} if there exists an initial condition $\mathbf{x}_{0,2} \in \mathbb{X}_0$ and controllers $\boldsymbol{\nu}_1 = (\boldsymbol{\nu}_{L}, \boldsymbol{\nu}_{H,1})$, $\boldsymbol{\nu}_2 = (\boldsymbol{\nu}_{L}, \boldsymbol{\nu}_{H,2})$ such that $\mathbf{x}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}$ and $\mathbf{x}_{\mathbf{x}_{0,2}, \boldsymbol{\nu}_2}$ are $\delta$-approximately indistinguishable.
+\end{definition}
+The two executions share the same public input, while their confidential inputs may differ. Consequently, the two controllers cannot be synthesized independently; rather, their choices must be coordinated to preserve indistinguishability. Since the intruder also has access to a subset of the inputs, the property represents a stronger form of indistinguishability. The corresponding HyperLTL formula is
+\begin{equation}
+\label{eq:hyperltl_noninterference}
+    \psi_{\mathrm{ni}} = \forall \tau_1 \, \exists \tau_2 . \, \square \, \mathsf{Ind}_{\delta}(\tau_1,\tau_2).
+\end{equation}
+
+\subsection{Approximate $K$-anonymity}
+
+Anonymity requires that the intruder cannot distinguish the true execution from a sufficiently large set of alternative executions.
+
+\begin{definition}[Approximate $K$-anonymity]
+\label{def:k_anonymity}
+Consider the system in \eqref{eq:system} and an initial condition $\mathbf{x}_{0,1} \in \mathbb{X}_0$. The system satisfies \emph{$\delta$-approximate $K$-anonymity} if there exist initial conditions $\mathbf{x}_{0,i} \in \mathbb{X}_0$ and controllers $\boldsymbol{\nu}_i$, $i = 1, \ldots, K$ such that all $K-1$ pairs of $\mathbf{x}_{\mathbf{x}_{0,1}, \boldsymbol{\nu}_1}$ and $\mathbf{x}_{\mathbf{x}_{0,i}, \boldsymbol{\nu}_i}$, $i = 2, \ldots, K$, are $\delta$-approximately indistinguishable.
+\end{definition}
+
+The corresponding HyperLTL formula is
+\begin{equation}
+\label{eq:hyperltl_anonymity}
+    \psi_{\mathrm{anon}} = \forall \tau_1 \exists \tau_2 \cdots \exists \tau_K . \, \square \left( \bigwedge_{i=2}^{K} \mathsf{Ind}_{\delta}(\tau_1,\tau_i) \right).
+\end{equation}
+The trace variable $\tau_1$ represents the real execution, while the alternative executions $\tau_2,\ldots,\tau_K$ form the anonymity set.
+
+\subsection{Problem formulation}
+
+Let $\psi$ be one of the security hyperproperties in
+\eqref{eq:hyperltl_opacity}, \eqref{eq:hyperltl_noninterference}, or \eqref{eq:hyperltl_anonymity}. Suppose that $\psi$ contains $p$ trace variables. For opacity and noninterference, $p=2$, while for $K$-anonymity, $p=K$.
+
+We form the $p$-fold self-composition of \eqref{eq:system} by introducing the augmented state and input spaces $\bar{\mathbb{X}} \coloneqq \mathbb{X} \times \dots \times \mathbb{X} $ and $\bar{\mathbb{U}} \coloneqq \mathbb{U} \times \dots \times \mathbb{U}$, with augmented state and input
+\begin{equation*}
+    \bar{\mathbf{x}} = (\mathbf{x}_1, \dots, \mathbf{x}_p) = \begin{bmatrix} \mathbf{x}_1^\top & \dots & \mathbf{x}_p^\top \end{bmatrix}^\top \in \bar{\mathbb{X}}, \text{ and}
+\end{equation*}
+\begin{equation*}
+    \bar{\mathbf{u}} = (\mathbf{u}_1, \dots, \mathbf{u}_p) = \begin{bmatrix} \mathbf{u}_1^\top & \dots & \mathbf{u}_p^\top \end{bmatrix}^\top \in \bar{\mathbb{U}}.
+\end{equation*}
+The augmented dynamics are $\dot{\bar{\mathbf{x}}} = \bar{\mathbf{f}}(\bar{\mathbf{x}}) + \bar{\mathbf{G}}(\bar{\mathbf{x}}) \, \bar{\mathbf{u}}$, where 
+\begin{equation} \label{eq:augmented_system}
+    \begin{aligned}
+        \bar{\mathbf{f}}(\bar{\mathbf{x}}) &= \begin{bmatrix}
+        \mathbf{f}(\mathbf{x}_1)^\top & \dots & \mathbf{f}(\mathbf{x}_p)^\top \end{bmatrix}^\top, \text{ and} \\ 
+        \bar{\mathbf{G}}(\bar{\mathbf{x}}) &= \operatorname{diag} \big( \mathbf{G}(\mathbf{x}_1), \dots, \mathbf{G}(\mathbf{x}_p) \big).
+    \end{aligned}
+\end{equation}
+Each trace variable $\tau_i$ corresponds to the trajectory of the $i$-th copy of the system, i.e., $\mathbf{x}_{\mathbf{x}_{0, i}, \boldsymbol{\nu}_i}(t)$ and induces a trace $\sigma_i$.
+
+\begin{problem}
+\label{pr:security_hyperproperty}
+Consider the system $S$ in \eqref{eq:system} with initial conditions $\mathbf{x}_{0, i} \in \mathbb{X}_0$, $i = 1, \dots, p$ and a security hyperproperty $\psi$ of the form
+\eqref{eq:hyperltl_opacity}, \eqref{eq:hyperltl_noninterference}, or \eqref{eq:hyperltl_anonymity}. Synthesize controllers
+$\boldsymbol{\nu}_i: \mathbb{R}_{\ge 0} \to \mathbb{U}$, $i=1, \dots, p$, for the self-composed system $\bar{S}$ in \eqref{eq:augmented_system} such that $\bar{S} \models \psi$.
+\end{problem}
+
+\section{Controller synthesis}
+\label{sec:control}
+
+We now construct CBF-based constraints for enforcing the security hyperproperties introduced in Section~\ref{sec:security}. The main idea is to encode each predicate appearing in the HyperLTL formulas as a $\mathbf{C}^1$ function over $\bar{\mathbb{X}}$ and enforce forward invariance of the corresponding superlevel set.
+
+For a continuously differentiable function $b: \bar{\mathbb{X}} \to \mathbb{R}$, the CBF condition over the augmented system \eqref{eq:augmented_system} is
+\begin{equation}
+\label{eq:augmented_cbf_condition}
+    L_{\bar{\mathbf{f}}} b(\bar{\mathbf{x}}) + L_{\bar{\mathbf{G}}} b(\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \ge -\alpha \big( b(\bar{\mathbf{x}}) \big),
+\end{equation}
+where $\alpha$ is a class-$\mathcal{K}$ function. If \eqref{eq:augmented_cbf_condition} is satisfied for all time and the initial augmented state belongs to the corresponding superlevel set, then that set is forward invariant.
+
+\subsection{Indistinguishability}
+
+For any pair of executions $(i,j)$, define
+\begin{equation}
+\label{eq:ind_cbf}
+    b_{ij}^{\mathrm{ind}}(\bar{\mathbf{x}}) = \delta^2 - \| \mathbf{h}(\mathbf{x}_i) - \mathbf{h}(\mathbf{x}_j)\|^2 .
+\end{equation}
+Then, $b_{ij}^{\mathrm{ind}}(\bar{\mathbf{x}})\ge 0$ if and only if $\mathsf{Ind}_{\delta}(\tau_i,\tau_j)$ is satisfied. Forward invariance of the set $\mathcal{C}_{ij}^{\mathrm{ind}} = \big\{ \bar{\mathbf{x}} \in \hat{\mathbb{X}} \mid b_{ij}^{\mathrm{ind}}(\bar{\mathbf{x}})\ge 0 \big\}$ is enforced by
+\begin{equation}
+\label{eq:ind_cbf_constraint}
+    L_{\bar{\mathbf{f}}} b_{ij}^{\mathrm{ind}}(\bar{\mathbf{x}}) + L_{\bar{\mathbf{G}}} b_{ij}^{\mathrm{ind}}(\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \ge -\alpha_{ij} \! \left( b_{ij}^{\mathrm{ind}} (\bar{\mathbf{x}}) \right).
+\end{equation}
+
+\subsection{Opacity}
+
+For opacity, the augmented state is $\bar{\mathbf{x}} = (\mathbf{x}_1, \mathbf{x}_2)$, where $\mathbf{x}_1$ and $\mathbf{x}_2$ are the real and alternative states, respectively. The first CBF 
+\begin{equation} \label{eq:opacity_ind_cbf}
+    b_{\mathrm{op},1}(\bar{\mathbf{x}}) = b_{12}^{\mathrm{ind}}(\bar{\mathbf{x}}) = \delta^2 - \|\mathbf{h}(\mathbf{x}_1) - \mathbf{h}(\mathbf{x}_2)\|^2
+\end{equation}
+enforces approximate indistinguishability. The second CBF enforces that the two states are never simultaneously secret, i.e., $\mathbf{x}_1 \notin \mathbb{X}_s$ or $\mathbf{x}_2 \notin \mathbb{X}_s$, where $\mathbb{X}_s$ is defined in \eqref{eq:secret_set}. Equivalently, $\max\{b_s(\mathbf{x}_1), b_s(\mathbf{x}_2)\} \ge 0$. To obtain a smooth predicate, we use the under-approximation of the $\max$ operator:
+\begin{equation}
+\label{eq:opacity_secret_cbf}
+    b_{\mathrm{op},2}(\bar{\mathbf{x}}) = \frac{1}{\beta} \ln \left(e^{\beta b_s(\mathbf{x}_1)} + e^{\beta b_s(\mathbf{x}_2)} \right) - \frac{\ln 2}{\beta}, \ \beta > 0.
+\end{equation}
+Since $b_{\mathrm{op},2}(\bar{\mathbf{x}}) \le \max \{b_s(\mathbf{x}_1),b_s(\mathbf{x}_2)\}$, $b_{\mathrm{op},2}(\bar{\mathbf{x}})\ge 0$ implies that at least one of execution is non-secret at all times.
+
+In total, the opacity constraints are
+\begin{equation} \label{eq:opacity_cbf_constraints}
+    L_{\bar{\mathbf{f}}} b_{\mathrm{op},\ell}(\bar{\mathbf{x}}) + L_{\bar{\mathbf{G}}} b_{\mathrm{op},\ell}(\bar{\mathbf{x}})\bar{\mathbf{u}} \ge -\alpha_{\mathrm{op},\ell} \left( b_{\mathrm{op},\ell}(\bar{\mathbf{x}}) \right), \quad \ell=1,2.
+\end{equation}
+
+In many environments the secret set may be the union of multiple regions, that is,
+\[
+    \mathbb{X}_s = \bigcup_{r=1}^{R_s} \mathbb{X}_s^{(r)}, \quad \mathbb{X}_s^{(r)} = \big\{ \mathbf{x} \in \mathbb{X} \mid b_s^{(r)}(\mathbf{x})<0 \big\}.
+\]
+Then, the condition that a trajectory is non-secret is equivalent to $\min_{r=1, \dots, R_s} b_s^{(r)}(\mathbf{x}) \ge 0$. If there exists an index $r \in \{1, \dots, R_s\}$ such that $b_s^{(r)}(\mathbf{x}) < 0$, then the trajectory is within the $r^{\mathrm{th}}$ secret region. Hence, in order to enforce that at least one of $\mathbf{x}_1$ and $\mathbf{x}_2$ is non-secret at all times, we need to impose
+\[
+    \max \! \left\{ \min_{r} b_s^{(r)}(\mathbf{x}_1),\; \min_{r} b_s^{(r)}(\mathbf{x}_2) \right\} \ge 0
+\]
+A smooth under-approximation of the $\min$ operator is
+\begin{equation}
+    m_s(\mathbf{x}) = -\frac{1}{\beta_s} \ln \left( \sum_{r=1}^{R_s} e^{-\beta_s b_s^{(r)}(\mathbf{x})} \right), \quad \beta_s > 0,
+\end{equation}
+which satisfies $m_s(\mathbf{x}) \le \min_{r = 1, \dots, R_s} b_s^{(r)}(\mathbf{x})$. In this case, \eqref{eq:opacity_secret_cbf} can be replaced by
+\begin{equation} \label{eq:opacity_multiple_secret_cbf}
+    b_{\mathrm{op},2}(\bar{\mathbf{x}}) = \frac{1}{\beta} \ln \left( e^{\beta m_s(\mathbf{x}_1)} + e^{\beta m_s(\mathbf{x}_2)} \right) - \frac{\log 2}{\beta}.
+\end{equation}
+
+\subsection{Noninterference}
+
+For noninterference, the augmented state again is $\bar{\mathbf{x}} = (\mathbf{x}_1, \mathbf{x}_2)$. The output indistinguishability condition is encoded by $b_{\mathrm{ni}}(\bar{\mathbf{x}}) = b_{12}^{\mathrm{ind}}(\bar{\mathbf{x}})$.
+The CBF constraint is
+\begin{equation}
+\label{eq:ni_cbf_constraint}
+    L_{\bar{\mathbf{f}}} b_{\mathrm{ni}}(\bar{\mathbf{x}}) + L_{\bar{\mathbf{G}}} b_{\mathrm{ni}}(\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \ge -\alpha_{\mathrm{ni}} \left( b_{\mathrm{ni}}(\bar{\mathbf{x}}) \right).
+\end{equation}
+
+Let $\mathbf{u}_i = (\mathbf{u}_{L, i}, \mathbf{u}_{H,i})$, $i= \{1, 2\}$. The requirement of identical public inputs between the two trajectories can be imposed directly as a linear equality constraint 
+\begin{equation} \label{eq:low_inputs}
+    \mathbf{u}_{L,1} = \mathbf{u}_{L,2}.
+\end{equation}
+
+Thus, noninterference is enforced by combining the CBF constraint in \eqref{eq:ni_cbf_constraint} with the input constraints.
+
+\subsection{$K$-anonymity \textcolor{red}{to write ...}}
+
+\subsection{Quadratic program}
+
+All the security-related CBF constraints above are affine in the augmented input $\bar{\mathbf{u}}$ because the self-composed system $\bar{S}$ in \eqref{eq:augmented_system} is input-affine. Therefore, we can stack them, resulting in constraints of the form  
+\[
+    \mathbf{A} (\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \ge \mathbf{b} (\bar{\mathbf{x}}), \quad \mathbf{A}_\mathrm{eq} (\bar{\mathbf{x}}) \, \bar{\mathbf{u}} = \mathbf{b}_\mathrm{eq} (\bar{\mathbf{x}}).
+\]
+More explicitly, the constraints are selected depending on the required security hyperproperty: (i) for opacity, we impose \eqref{eq:opacity_cbf_constraints}, (ii) for noninterference, we impose \eqref{eq:ni_cbf_constraint} and \eqref{eq:low_inputs}, and (iii) for $K$-anonymity, we impose \textcolor{red}{*}.
+
+By selecting a quadratic objective $\bar{\mathbf{u}}^\top \mathbf{W} \, \bar{\mathbf{u}}$, where $\mathbf{W} \in \mathbb{R}^{(m \cdot p) \times (m \cdot p)}$ is positive-definite, the synthesis problem can be formulated as a convex QP. At each time, the controller is obtained by solving
+\begin{equation}
+\label{eq:qp}
+    \begin{aligned}
+        \bar{\mathbf{u}}^\star(\bar{\mathbf{x}})  = \arg\min_{\bar{\mathbf{u}} \in \bar{\mathbb{U}}} \quad
+        & \bar{\mathbf{u}}^\top \mathbf{W} \, \bar{\mathbf{u}} \\
+        \mathrm{s.t.} \quad
+        & \mathbf{A} (\bar{\mathbf{x}}) \, \bar{\mathbf{u}} \ge -\mathbf{b} (\bar{\mathbf{x}}) \\
+        & \mathbf{A}_\mathrm{eq} (\bar{\mathbf{x}}) \, \bar{\mathbf{u}} = \mathbf{b}_\mathrm{eq} (\bar{\mathbf{x}})
+    \end{aligned}
+\end{equation}
+The closed-loop trajectories of \eqref{eq:augmented_system} are obtained by applying the feedback law $\bar{\boldsymbol{\nu}}(\bar{\mathbf{x}}) = \bar{\mathbf{u}}^\star(\bar{\mathbf{x}})$ in a sampled-data manner.
+
+\begin{theorem}
+\label{thm:qp}
+    Consider the self-composed system in \eqref{eq:augmented_system} under the feedback controller obtained from \eqref{eq:qp}. Suppose that the QP is feasible for all $t \in \mathbb{R}_{\ge 0}$. Then: (i) if the opacity constraints \eqref{eq:opacity_cbf_constraints} are enforced and the initial augmented state satisfies $b_{\mathrm{op},1}(\bar{\mathbf{x}}(0))\ge 0$ and $b_{\mathrm{op},2}(\bar{\mathbf{x}}(0))\ge 0$, then $\bar{S} \models \psi_{\mathrm{op}}$; (ii) if the noninterference constraints \eqref{eq:ni_cbf_constraint} are enforced and \eqref{eq:low_inputs} are enforced and $\bar{\mathbf{x}}(0)$ satisfies $b_{\mathrm{ni}}(\bar{\mathbf{x}}(0))\ge 0$, then $\bar{S} \models \psi_{\mathrm{ni}}$; and (iii) if the anonymity constraint \textcolor{red}{*} is enforced and $\bar{\mathbf{x}}(0)$ satisfies $b_{\mathrm{anon}}(\bar{\mathbf{x}}(0)) \ge 0$, then $\bar{S} \models \psi_{\mathrm{anon}}$.
+\end{theorem}
+\begin{proof}
+    For opacity and using Theorem~\ref{thm:forward_invariance}, the CBF constraints \eqref{eq:opacity_cbf_constraints} render the superlevel sets of $b_{\mathrm{op},1}$ and $b_{\mathrm{op},2}$ forward invariant. Hence, the two executions remain $\delta$-approximately indistinguishable and are never simultaneously in the secret set. Therefore, $\psi_{\mathrm{op}}$ is satisfied.
+    For noninterference, \eqref{eq:ni_cbf_constraint} renders the indistinguishability set forward invariant, while \eqref{eq:low_inputs} enforces equality of the public inputs. Thus, the closed-loop trajectories satisfy \eqref{eq:hyperltl_noninterference}.
+    For $K$-anonymity, \textcolor{red}{*}
+\end{proof}
+\begin{remark} \label{rem:security_and_LTL}
+    Additional LTL tasks encoded through CBF constraints \cite{srinivasan2021} can be incorporated in \eqref{eq:qp} by appending the corresponding inequalities to the constraint set. Hence, standard task specifications and security hyperproperties can be enforced within the same online QP.
+\end{remark}
+
+\subsection{Remarks about singular points}
+
+For a CBF constraint associated with a function
+$b_r:\bar{\mathbb{X}}\to\mathbb{R}$, the corresponding row of
+$A(\bar{\mathbf{x}})$ is
+\[
+    A_r(\bar{\mathbf{x}})
+    =
+    L_{\bar{\mathbf{G}}} b_r(\bar{\mathbf{x}})
+    =
+    \frac{\partial b_r}{\partial \bar{\mathbf{x}}}(\bar{\mathbf{x}})
+    \bar{\mathbf{G}}(\bar{\mathbf{x}}).
+\]
+At singular points $\bar{\mathbf{x}}$ such that $A_r(\bar{\mathbf{x}}) = 0$, the corresponding CBF constraint reduces to $L_{\bar{\mathbf{f}}} b_r(\bar{\mathbf{x}}) \ge -\alpha_r\big(b_r(\bar{\mathbf{x}})\big)$ and therefore the control input $\bar{\mathbf{u}}$ has no effect on the value of $b_r$. Thus, a zero row of $A(\bar{\mathbf{x}})$ may lead to infeasibility.
+
+For the indistinguishability CBF in \eqref{eq:ind_cbf}, let $\mathbf{e}_{ij} = \mathbf{h}(\mathbf{x}_i)-\mathbf{h}(\mathbf{x}_j)$. The corresponding row of $A(\bar{\mathbf{x}})$ is zero if and only if $\mathbf{e}_{ij}^\top \tfrac{\partial h(\mathbf{x}_i)}{\partial \mathbf{x}_i} \, \mathbf{G}(\mathbf{x}_i) = \mathbf{e}_{ij}^\top \tfrac{\partial h(\mathbf{x}_j)}{\partial \mathbf{x}_j} \, \mathbf{G}(\mathbf{x}_j) = \mathbf{0}_{1 \times m}$. If $\tfrac{\partial h(\mathbf{x}_i)}{\partial \mathbf{x}_i} \, \mathbf{G}(\mathbf{x}_i)$ and
+$\tfrac{\partial h(\mathbf{x}_j)}{\partial \mathbf{x}_j} \, \mathbf{G}(\mathbf{x}_j)$ have full row rank, then the condition is equivalent to $\mathbf{e}_{ij} = \mathbf{0}_q$. In that case, $b_{ij}^\textrm{ind}(\bar{\mathbf{x}}) = \delta^2 > 0$.
+
+For the non-simultaneous secrecy CBF in \eqref{eq:opacity_secret_cbf},
+define
+\[
+    w_i(\bar{\mathbf{x}})
+    =
+    \frac{e^{\beta b_s(\mathbf{x}_i)}}
+    {e^{\beta b_s(\mathbf{x}_1)}+e^{\beta b_s(\mathbf{x}_2)}},
+    \qquad i=1,2.
+\]
+Since $w_i(\bar{\mathbf{x}})>0$, the corresponding row of
+$A(\bar{\mathbf{x}})$ is zero if and only if $\frac{\partial b_s(\mathbf{x}_1)}{\partial \mathbf{x}_1} \mathbf{G}(\mathbf{x}_1) = \frac{\partial b_s(\mathbf{x}_2)}{\partial \mathbf{x}_2} \mathbf{G}(\mathbf{x}_2) = \mathbf{0}_{1 \times m}$.
+
+If the secret set is ellipsoidal, i.e., $b_s(\mathbf{x}) = (\mathbf{x}-\mathbf{c}_s)^\top \mathbf{Q}_s (\mathbf{x}-\mathbf{c}_s) - 1$, where $\mathbf{c}_s \in \mathbb{R}^n$ and $\mathbf{Q}_s \in \mathbb{R}^{n \times n}$ is symmetric and positive-definite, the zero-row condition becomes $(\mathbf{x}_i-\mathbf{c}_s)^\top \mathbf{Q}_s \, \mathbf{G}(\mathbf{x}_i) = \mathbf{0}_{1 \times m}$, $i= \{1, 2\}$.
+For a fully actuated single-integrator system, this occurs only at the center of the ellipsoid, i.e., $\mathbf{x}_1=\mathbf{x}_2=\mathbf{c}_s$.
+
+For multiple secret regions, the non-simultaneous secrecy CBF is given in \eqref{eq:opacity_multiple_secret_cbf}. Define
+\[
+    p_r(\mathbf{x}) = \frac{e^{-\beta_s b_s^{(r)}(\mathbf{x})}} {\sum_{\ell=1}^{R_s} e^{-\beta_s b_s^{(\ell)}(\mathbf{x})}}, \quad r=1,\ldots,R_s,
+\]
+and assume that each secret region $\mathbb{X}_s^{(r)}$ is ellipsoidal, i.e., $b_s^{(r)}(\mathbf{x}) = (\mathbf{x}-\mathbf{c}_r)^\top \mathbf{Q}_r (\mathbf{x}-\mathbf{c}_r) - 1$. Then the corresponding row of $A(\bar{\mathbf{x}})$ is zero if and only if 
+\begin{equation} \label{eq:singular}
+    \left( \sum_{r=1}^{R_s} p_r(\mathbf{x}_i) (\mathbf{x}_i-\mathbf{c}_r)^\top \mathbf{Q}_r \right) \mathbf{G}(\mathbf{x}_i) = \mathbf{0}_{1\times m}, \ i=1,2.
+\end{equation}
+\begin{assumption}
+    To avoid singularities on the boundary of the set $\{\bar{\mathbf{x}} \mid b_{\mathrm{op}, 2} (\bar{\mathbf{x}})\ge 0\}$, we assume that all points satisfying \eqref{eq:singular} lie strictly in its interior. 
+\end{assumption}
+Similarly, the indistinguishability row is always zero when $\mathbf{e}_{ij} = \mathbf{0}_q$; in this case $b_{ij}^{\mathrm{ind}}(\bar{\mathbf{x}})=\delta^2 > 0$. A standard way to handle points where the relative degree of the corresponding CBF constraint is larger than 1 is to employ high-order CBFs, which differentiate the CBF until the input appears \cite{tan2022}.
+
+\section{Case studies}
+\label{sec:case_study}
+
+In this section, we illustrate the proposed framework on a robot navigating a 2D workspace under opacity requirements, as defined in Def.~\ref{def:opacity}. A reach-avoid objective is included to demonstrate that the proposed security constraints can be combined with standard LTL tasks in the same QP (see Remark~\ref{rem:security_and_LTL}).
+
+We consider a single-integrator system $\dot{\mathbf{x}} = \mathbf{u}$,
+where $\mathbf{x} = (x_1, x_2)^\top$ and $\mathbf{u} = (u_1, u_2)^\top$, with $-2 \leq u_i \leq 2, \ i=1, 2$. The output is $\mathbf{y} = \mathbf{h}(\mathbf{x}) = \mathbf{x}$, i.e., the intruder observes the robot position directly up to precision $\delta = 0.4$.
+
+The workspace contains two unsafe, three secret, one initial and one goal region, all modeled as ellipsoids. The unsafe regions $\mathbb{X}_u^{(1)}$ and $\mathbb{X}_u^{(2)}$ have
+\begin{equation*}
+    \begin{aligned}
+        \mathbf{c}_u^{(1)}=(1,1.5),& \ \mathbf{c}_u^{(2)}=(3.4,4.6), \\
+        \mathbf{Q}_u^{(1)}=\operatorname{diag}(4,1),& \ \mathbf{Q}_u^{(2)}=\operatorname{diag}(4,4).
+    \end{aligned}
+\end{equation*}
+The secret regions $\mathbb{X}_s^{(i)}$, $i=1,2,3$, are described by
+\begin{equation*}
+    \begin{aligned}
+        \mathbf{c}_s^{(1)} = (5.5, 3.9),& \, \mathbf{c}_s^{(2)} = (1.8, 3.5), \, \mathbf{c}_s^{(3)} = (4, 6.2), \\
+        \mathbf{Q}_s^{(1)} = \operatorname{diag}(\tfrac{4}{9}, \, \tfrac{4}{9}),& \mathbf{Q}_s^{(2)} = \operatorname{diag}(1, 1), \, \mathbf{Q}_s^{(3)} = \operatorname{diag}(1, 1)
+    \end{aligned}
+\end{equation*}
+The initial and goal regions $\mathbb{X}_0$ and $\mathbb{X}_g$, respectively, are defined by
+\begin{equation*}
+    \begin{aligned}
+        \mathbf{c}_0 = (0, 0),& \ \mathbf{Q}_0 = \operatorname{diag}(25, 25), \\ \mathbf{c}_g = (5.2, 7.1),& \ \mathbf{Q}_g = \operatorname{diag}(100, 100).
+    \end{aligned}
+\end{equation*}
+
+The security objective is $\delta$-approximate infinite-horizon opacity with respect to $\mathbb{X}_s=\bigcup_{i=1}^{3}\mathbb{X}_s^{(i)}$ and is enforced using the indistinguishability CBF in \eqref{eq:ind_cbf} and the multiple-secret-region CBF in \eqref{eq:opacity_multiple_secret_cbf}. The auxiliary reach-avoid task is implemented using a standard CLF for reaching $\mathbb{X}_g$ and CBFs for avoiding $\mathbb{X}_u^{(1)}$ and $\mathbb{X}_u^{(2)}$. All constraints are stacked in the QP \eqref{eq:qp}.
+\begin{figure}[tb]
+    \centering
+    \includegraphics[scale=0.8]{fig/si0.4traj.pdf}
+    \caption{Real and alternative trajectories under opacity requirements.}
+    \label{fig:traj}
+\end{figure}
+
+The real and alternative trajectories are initialized at $\mathbf{x}_{0, 1} = (0,0)$ and $\mathbf{x}_{0, 2} = (0, 0.1)$. The synthesized trajectories are shown in Fig.~\ref{fig:traj}. The real trajectory reaches the goal and avoids the unsafe regions, while the alternative one remains observationally close to the real one and non-secret whenever the real execution visits a secret region (thick lines in Fig.~\ref{fig:traj}). Hence, the intruder cannot infer secret visits from observations.
+
+% \begin{figure}[tb]
+%     \centering
+%     \includegraphics[scale=0.3]{fig/si0.4ctrl.pdf}
+%     \caption{Control input}
+%     \label{fig:ctrl}
+% \end{figure}
+
+% \begin{figure}[tb]
+%     \centering
+%     \includegraphics[scale=0.3]{fig/si0.4delta.pdf}
+%     \caption{Indistinghuisability CBFs}
+%     \label{fig:delta}
+% \end{figure}
+
+% \begin{figure}[tb]
+%     \centering
+%     \includegraphics[scale=0.3]{fig/si0.4secret.pdf}
+%     \caption{Secrecy CBFs}
+%     \label{fig:secret}
+% \end{figure}
+
+% \begin{figure}[tb]
+%     \centering
+%     \includegraphics[scale=0.3]{fig/si0.4safety.pdf}
+%     \caption{Safety CBFs}
+%     \label{fig:safety}
+% \end{figure}
+
+\section{Conclusion}
+\label{sec:conclusion}
+ 
+\bibliographystyle{IEEEtran}
+\bibliography{Ref}
+
+
+\end{document}
